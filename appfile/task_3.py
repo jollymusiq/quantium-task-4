@@ -1,14 +1,12 @@
 import pandas as pd
-import pathlib
 from dash import Dash, Input, Output, dcc, html
 import plotly.graph_objects as go
 import plotly.express as px
 
 # Paths (relative instead of absolute)
-data_dir = pathlib.Path(__file__).parent / "data"
-df0 = pd.read_csv(data_dir / "daily_sales_data_0.csv")
-df1 = pd.read_csv(data_dir / "daily_sales_data_1.csv")
-df2 = pd.read_csv(data_dir / "daily_sales_data_2.csv")
+df0 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_0.csv")
+df1 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_1.csv")
+df2 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_2.csv")
 df = pd.concat([df0, df1, df2], ignore_index=True)
 
 # Data cleaning

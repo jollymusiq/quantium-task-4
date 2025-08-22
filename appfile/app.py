@@ -1,25 +1,32 @@
 import csv
-import time
-from selenium import webdriver
+import os
 
-for file_path in [
-    "C:/Users/HP/Desktop/quantium-starter-repo-main/quantium-starter-repo-main/data/daily_sales_data_0.csv",
-    "C:/Users/HP/Desktop/quantium-starter-repo-main/quantium-starter-repo-main/data/daily_sales_data_1.csv",
-    "C:/Users/HP/Desktop/quantium-starter-repo-main/quantium-starter-repo-main/data/daily_sales_data_2.csv"
+output_path = "output.csv"
+
+# Clear output file before appending
+with open(output_path, mode="w", newline='') as output_file:
+    fieldnames = ['Sales', 'date', 'region']
+    writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+    writer.writeheader()
+
+# Process each input file
+for file_name in [
+    "../new/data/daily_sales_data_0.csv",
+    "../new/data/daily_sales_data_1.csv",
+    "../new/data/daily_sales_data_2.csv"
 ]:
-    with open(file_path, mode='r') as file:
-        csv_reader = csv.DictReader(file)
-        for row in csv_reader:
-            if(row['product'] == 'pink morsel'):
-                Sales = int(row['quantity']) * float(row['price'].replace('$', '').replace(',', ''))
-            date = row['date']
-            region = row['region']
-            print(Sales, date, region)
-            with open('output.csv', mode='a', newline='') as output_file:
-                fieldnames = ['Sales', 'date', 'region']
-                writer = csv.DictWriter(output_file, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerow({'Sales': Sales, 'date': date, 'region': region})
+    try:
+        with open(file_name, mode="r") as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                if row['product'] == 'pink morsel':
+                    sales = int(row['quantity']) * float(row['price'].replace('$', '').replace(',', ''))
+                    date = row['date']
+                    region = row['region']
+                    print(sales, date, region)
 
-
-
+                    with open(output_path, mode="a", newline='') as output_file:
+                        writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+                        writer.writerow({'Sales': sales, 'date': date, 'region': region})
+    except FileNotFoundError:
+        print(f"File not found: {file_name}")
