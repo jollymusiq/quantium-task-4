@@ -1,96 +1,94 @@
 import pandas as pd
 from dash import Dash, Input, Output, dcc, html
-import plotly.graph_objects as go
 import plotly.express as px
 
-# Paths (relative instead of absolute)
-df0 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_0.csv")
-df1 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_1.csv")
-df2 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_2.csv")
-df = pd.concat([df0, df1, df2], ignore_index=True)
+def load_data():
+    df0 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_2.csv")
+    df1 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_1.csv")
+    df2 = pd.read_csv("/workspaces/quantium-task-4/new/data/daily_sales_data_2.csv")
+    df = pd.concat([df0, df1, df2], ignore_index=True)
 
-# Data cleaning
-df['date'] = pd.to_datetime(df['date'])
-df['price'] = df['price'].replace({r'\$': '', ',': ''}, regex=True).astype(float)
-df['quantity'] = df['quantity'].astype(int)
-df = df[df['product'] == 'pink morsel']
-df['Sales'] = df['quantity'] * df['price']
-df['region'] = df['region'].str.lower()
+    df['date'] = pd.to_datetime(df['date'])
+    df['price'] = df['price'].replace({r'\$': '', ',': ''}, regex=True).astype(float)
+    df['quantity'] = df['quantity'].astype(int)
+    df = df[df['product'] == 'pink morsel']
+    df['sales'] = df['quantity'] * df['price']
+    df['region'] = df['region'].str.lower()
+    return df
 
-# Dash app
-app = Dash(__name__)
+def update_graphs(selected_region, start_date, end_date):
+    df = load_data()
 
-app.layout = html.Div([
-    html.H1("Soul Foods", style={'font-family': 'Arial'}),
-    html.H2("Pink Morsel", style={'font-family': 'Arial'}),
-    
-    html.Label("Select Region:"),
-    dcc.RadioItems(
-        id="region-selector",
-        options=[{'label': r.capitalize(), 'value': r} for r in ['all','north','south','east','west']],
-        value='all',
-        labelStyle={'display': 'inline-block'}
-    ),
-    
-    html.Div([
-        dcc.Graph(id="sales-graph", style={'width': '50%'}),
-        dcc.Graph(id="daily-sales-graph", style={'width': '50%'})
-    ], style={'display': 'flex'}),
-    
-    html.Div(id="drill-output")
-])
+    df['date'] = pd.to_datetime(df['date'])
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
 
-@app.callback(
-    Output("sales-graph", "figure"),
-    Output("daily-sales-graph", "figure"),
-    Output("drill-output", "children"),
-    Input("region-selector", "value"),
-    Input("daily-sales-graph", "clickData")
-)
-def update_graphs(selected_region, clickData):
-    filtered_df = df if selected_region == "all" else df[df["region"] == selected_region]
+    # filter by region
+    if selected_region.lower() != "all":
+        df = df[df["region"].str.lower() == selected_region.lower()]
 
-    # Line chart
-    daily_sales = filtered_df.groupby(["date", "region"])["Sales"].sum().reset_index()
-    line_fig = px.line(daily_sales, x="date", y="Sales", color="region", title="Daily Sales by Region")
+    # filter by date range
+    df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
-    # 3D Scatter
-    scatter_fig = go.Figure()
-    if selected_region == "all":
-        for r in df["region"].unique():
-            rd = df[df["region"] == r].sort_values("date")
-            scatter_fig.add_trace(go.Scatter3d(
-                x=rd["date"].dt.strftime('%Y-%m-%d'),
-                y=[r] * len(rd),
-                z=rd["price"],
-                mode="lines+markers",
-                name=r.capitalize()
-            ))
-    else:
-        rd = filtered_df.sort_values("date")
-        scatter_fig.add_trace(go.Scatter3d(
-            x=rd["date"].dt.strftime('%Y-%m-%d'),
-            y=[selected_region] * len(rd),
-            z=rd["price"],
-            mode="lines+markers",
-            name=selected_region.capitalize()
-        ))
+    if df.empty:
+        return px.line(title="No data"), px.scatter(title="No data"), "No data available for selection."
 
-    scatter_fig.update_layout(title="3D Daily Price Trend", template="plotly_white")
+    daily_sales = df.groupby(["date", "region"])["sales"].sum().reset_index()
 
-    # Drill info
-    drill_info = ""
-    if clickData:
-        clicked_date = pd.to_datetime(clickData["points"][0]["x"])
-        clicked_year = clicked_date.year
-        year_data = df[df["date"].dt.year == clicked_year]
-        drill_info = html.Div([
-            html.H3(f"Drill-through: {clicked_year}"),
-            html.P(f"Total Sales: ${year_data['Sales'].sum():,.2f}"),
-            html.P(f"Average Price: ${year_data['price'].mean():.2f}")
-        ])
+    line_fig = px.line(
+        daily_sales, x="date", y="sales", color="region", 
+        title="Daily Sales by Region"
+    )
 
-    return line_fig, scatter_fig, drill_info
+    scatter_fig = px.scatter(
+        daily_sales, x="date", y="sales", color="region", 
+        size="sales", title="Sales Scatter Plot"
+    )
+
+    return line_fig, scatter_fig, ""
+
+def create_dash_app():
+    df = load_data()
+
+    app = Dash(__name__)
+
+    app.layout = html.Div([
+        html.H1("Soul Foods", id="header-h1"),
+        html.H2("Pink Morsel", id="header-h2"),
+
+        html.Label("Select Region:"),
+        dcc.RadioItems(
+            id="region-selector",
+            options=[{'label': r.capitalize(), 'value': r} for r in ['all','north','south','east','west']],
+            value='all'
+        ),
+
+        dcc.DatePickerRange(
+            id="date-picker",
+            start_date=df["date"].min(),
+            end_date=df["date"].max()
+        ),
+
+        html.Button("Submit", id="submit-button"),
+
+        dcc.Graph(id="line-graph"),
+        dcc.Graph(id="scatter-graph"),
+
+        html.Div(id="error-message", style={"color": "red"})
+    ])
+
+    @app.callback(
+        Output("line-graph", "figure"),
+        Output("scatter-graph", "figure"),
+        Output("error-message", "children"),
+        Input("region-selector", "value"),
+        Input("date-picker", "start_date"),
+        Input("date-picker", "end_date")
+    )
+    def update_graph_callback(selected_region, start_date, end_date):
+        return update_graphs(selected_region, start_date, end_date)
+
+    return app
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    create_dash_app().run(debug=True)
